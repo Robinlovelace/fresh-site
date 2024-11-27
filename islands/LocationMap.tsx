@@ -7,15 +7,19 @@ interface Location {
   name?: string;
 }
 
+interface LatLng {
+  lat: number;
+  lng: number;
+}
+
 export default function LocationMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
-  const [markers, setMarkers] = useState<any[]>([]);
+  const [locationCount, setLocationCount] = useState(0);
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
 
-    // Initialize the map
     const L = (window as any).L;
     const map = L.map(mapRef.current).setView([0, 0], 2);
     
@@ -25,64 +29,53 @@ export default function LocationMap() {
 
     mapInstanceRef.current = map;
 
-    // Handle map clicks
-    map.on('click', async (e: any) => {
-      const { lat, lng } = e.latlng;
-
-      // Get location name from user
+    map.on('click', async ({ latlng }: { latlng: LatLng }) => {
       const name = prompt("Enter a name for this location:");
       if (!name) return;
 
-      // Add new marker
-      const marker = L.marker([lat, lng]).addTo(map);
-      marker.bindPopup(name).openPopup();
-      setMarkers(prev => [...prev, marker]);
-
-      // Save location
       try {
-        const response = await fetch('/api/locations', {
+        const res = await fetch('/api/locations', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            latitude: lat,
-            longitude: lng,
-            name,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            latitude: latlng.lat, 
+            longitude: latlng.lng, 
+            name 
           }),
         });
-
-        if (!response.ok) {
-          throw new Error('Failed to save location');
-        }
+        if (!res.ok) throw new Error('Failed to save location');
+        
+        L.marker([latlng.lat, latlng.lng])
+          .bindPopup(name)
+          .addTo(map)
+          .openPopup();
+          
+        setLocationCount(prev => prev + 1);
       } catch (error) {
         alert('Failed to save location');
-        marker.remove();
-        setMarkers(prev => prev.filter(m => m !== marker));
       }
     });
 
-    // Load existing locations
     fetch('/api/locations')
       .then(res => res.json())
       .then(locations => {
+        setLocationCount(locations.length);
         locations.forEach((loc: Location) => {
-          const marker = L.marker([loc.latitude, loc.longitude])
+          L.marker([loc.latitude, loc.longitude])
             .bindPopup(loc.name || 'Unnamed location')
             .addTo(map);
-          setMarkers(prev => [...prev, marker]);
         });
       })
       .catch(console.error);
 
-    return () => {
-      markers.forEach(marker => marker.remove());
-      map.remove();
-    };
+    return () => map.remove();
   }, []);
 
   return (
     <div class="w-full">
+      <div class="text-lg font-semibold mb-4">
+        Number of locations: {locationCount}
+      </div>
       <div ref={mapRef} style={{ height: '500px', width: '100%' }} />
     </div>
   );
