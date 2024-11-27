@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 
 interface Location {
+  id: string;
   latitude: number;
   longitude: number;
   name?: string;
@@ -9,7 +10,7 @@ interface Location {
 export default function LocationMap() {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
+  const [markers, setMarkers] = useState<any[]>([]);
 
   useEffect(() => {
     if (!mapRef.current || mapInstanceRef.current) return;
@@ -27,19 +28,15 @@ export default function LocationMap() {
     // Handle map clicks
     map.on('click', async (e: any) => {
       const { lat, lng } = e.latlng;
-      
-      // Remove existing marker if any
-      if (markerRef.current) {
-        markerRef.current.remove();
-      }
-
-      // Add new marker
-      const marker = L.marker([lat, lng]).addTo(map);
-      markerRef.current = marker;
 
       // Get location name from user
       const name = prompt("Enter a name for this location:");
       if (!name) return;
+
+      // Add new marker
+      const marker = L.marker([lat, lng]).addTo(map);
+      marker.bindPopup(name).openPopup();
+      setMarkers(prev => [...prev, marker]);
 
       // Save location
       try {
@@ -58,11 +55,10 @@ export default function LocationMap() {
         if (!response.ok) {
           throw new Error('Failed to save location');
         }
-
-        marker.bindPopup(name).openPopup();
       } catch (error) {
         alert('Failed to save location');
         marker.remove();
+        setMarkers(prev => prev.filter(m => m !== marker));
       }
     });
 
@@ -71,14 +67,16 @@ export default function LocationMap() {
       .then(res => res.json())
       .then(locations => {
         locations.forEach((loc: Location) => {
-          L.marker([loc.latitude, loc.longitude])
+          const marker = L.marker([loc.latitude, loc.longitude])
             .bindPopup(loc.name || 'Unnamed location')
             .addTo(map);
+          setMarkers(prev => [...prev, marker]);
         });
       })
       .catch(console.error);
 
     return () => {
+      markers.forEach(marker => marker.remove());
       map.remove();
     };
   }, []);

@@ -1,3 +1,5 @@
+/// <reference lib="deno.unstable" />
+
 interface Location {
   id: string;
   latitude: number;
@@ -6,8 +8,8 @@ interface Location {
   createdAt: number;
 }
 
-// In-memory storage
-const locations: Location[] = [];
+// Initialize Deno KV
+const kv = await Deno.openKv();
 
 export async function handler(req: Request): Promise<Response> {
   if (req.method === "POST") {
@@ -20,13 +22,23 @@ export async function handler(req: Request): Promise<Response> {
       createdAt: Date.now(),
     };
 
-    locations.push(location);
+    // Store in KV
+    await kv.set(["locations", location.id], location);
+    
     return new Response(JSON.stringify(location), {
       headers: { "Content-Type": "application/json" },
     });
   }
 
   if (req.method === "GET") {
+    const locations: Location[] = [];
+    
+    // Retrieve all locations
+    const iter = kv.list({ prefix: ["locations"] });
+    for await (const entry of iter) {
+      locations.push(entry.value as Location);
+    }
+
     return new Response(JSON.stringify(locations), {
       headers: { "Content-Type": "application/json" },
     });
