@@ -4,7 +4,8 @@ interface Location {
   id: string;
   latitude: number;
   longitude: number;
-  name?: string;
+  userName?: string;
+  sound?: string;
 }
 
 interface LatLng {
@@ -30,8 +31,11 @@ export default function LocationMap() {
     mapInstanceRef.current = map;
 
     map.on('click', async ({ latlng }: { latlng: LatLng }) => {
-      const name = prompt("Enter a name for this location:");
-      if (!name) return;
+      const userName = prompt("Name (optional, made-up names welcome):");
+      if (userName === null) return; // User clicked cancel
+      
+      const sound = prompt("Sound:");
+      if (sound === null) return; // User clicked cancel
 
       try {
         const res = await fetch('/api/locations', {
@@ -39,14 +43,23 @@ export default function LocationMap() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             latitude: latlng.lat, 
-            longitude: latlng.lng, 
-            name 
+            longitude: latlng.lng,
+            userName: userName || 'Anonymous',
+            sound
           }),
         });
         if (!res.ok) throw new Error('Failed to save location');
         
+        const popupContent = `
+          <div>
+            <strong>${userName || 'Anonymous'}</strong>
+            <br/>
+            <em>"${sound}"</em>
+          </div>
+        `;
+
         L.marker([latlng.lat, latlng.lng])
-          .bindPopup(name)
+          .bindPopup(popupContent)
           .addTo(map)
           .openPopup();
           
@@ -61,8 +74,16 @@ export default function LocationMap() {
       .then(locations => {
         setLocationCount(locations.length);
         locations.forEach((loc: Location) => {
+          const popupContent = `
+            <div>
+              <strong>${loc.userName || 'Anonymous'}</strong>
+              <br/>
+              <em>"${loc.sound}"</em>
+            </div>
+          `;
+
           L.marker([loc.latitude, loc.longitude])
-            .bindPopup(loc.name || 'Unnamed location')
+            .bindPopup(popupContent)
             .addTo(map);
         });
       })

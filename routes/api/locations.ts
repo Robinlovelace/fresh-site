@@ -4,7 +4,8 @@ interface Location {
   id: string;
   latitude: number;
   longitude: number;
-  name?: string;
+  userName?: string;
+  sound?: string;
   createdAt: number;
 }
 
